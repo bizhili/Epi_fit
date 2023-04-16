@@ -1,0 +1,11 @@
+# socio_epi_networks
+
+We provide a few libraries which can be used to simulate many different events. The focus of the libraries is to provide a flexible framework for performing stochastic simulations on related events during an epidemic. We have a structure in place with a set of transitions (transitions.py), ways of generating networks (network_generation.py), and visualising the results (graphing_utils.py).
+
+The transitions are independent but are composable, and these compositions can take on meaning. On each forward call, a transition takes in a dictionary of states and returns the dictionary with potentially modified states - this allows for composability. For example, composing an S_I and I_S transition would give you an SIS model. All transitions take in the names of states they will base outcomes on and modify, and some transitions take in a contact network for determining outcomes based on contacts. This allows for flexibility and modularity. Note that the order of related transitions matters.
+
+Any network, as long as it is represented as a sparse matrix, can be used in these transitions. We made use of sparse matrices for contact networks because theyare a realistic community structure and they keep running time and memory usage down. We provide some helper functions in graphing_utils and capsule_utils which can be used to create reasonable biological and social contact networks. For example, the biological contact network can be generated based on contact rates between age groups and a distribution of household compositions and the social network can be generated with some probability that people meeting in the real world are connected on social media and that people in the same age group are more likely to be connected.
+
+The plotting function in graphing_utils can be used by passing in a log of a simulation in a form shown in the example. Variability in simulations and results by some grouping like age can be easily visualized.
+
+In the example, you can see the structure of how a simulation can be set up, run, and visualized. States - like susceptible, infected, and vaccinated - are tensors stored in a dictionary keyed by names we assign. How to initialize these states is up to the user, but we provide what we did as reference. 
