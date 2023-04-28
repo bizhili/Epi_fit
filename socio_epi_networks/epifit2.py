@@ -27,7 +27,7 @@ def get_ER_random_contact(n, avgDegree):
 
 
 class EPI_dense(torch.nn.Module):
-    def __init__(self, ISNet, psMatrix, population, device, train=False):
+    def __init__(self, ISNet, psMatrix, population, device, train=False, cc=None, recursive=False):
         super(EPI_dense, self).__init__()
         self._n= ISNet.size()[0]
         self._IS= ISNet
@@ -40,13 +40,20 @@ class EPI_dense(torch.nn.Module):
         if train==True:
             self._psMatrix=torch.nn.Parameter(psMatrix)
         self._P= self._state
+        self._cc= cc
+        self._recursive= recursive
     
     def reset_population(self, population):
         self._state= torch.stack((population["S"], population["E"], population["I"], population["R"]))
         self._P= self._state
 
     def forward(self):
-        stateGradient= torch.clone(self._state)
+        stateGradient= None
+        if self._recursive:
+            stateGradient= self._state
+        else:
+            stateGradient= torch.clone(self._state)
+
         L= torch.zeros_like(self._state, device=device)
         L[0]= stateGradient[0]*torch.matmul(self._IS, stateGradient[2])
         L[1]= torch.matmul(stateGradient[1], self._EE)
@@ -56,18 +63,24 @@ class EPI_dense(torch.nn.Module):
             prob= 1- torch.exp(torch.matmul(torch.log(1 - self._psMatrix.T), L))
         else:
             psMatrix= torch.sigmoid(self._psMatrix)
+            if self._cc is not None:
+                psMatrix= psMatrix*self._cc
             prob= 1- torch.exp(torch.matmul(torch.log(1 - psMatrix.T), L))
         _stable_prob= 1- torch.sum(prob, 0)
         prob= prob+ stateGradient*_stable_prob
 
-        with torch.no_grad():
-            self._state= self.rample_uniform_matrix(prob)
+        if self._train==False or self._recursive==False:
+            with torch.no_grad():
+                self._state= self.sample_uniform_matrix(prob)
+                self._P= prob
+        elif self._recursive==True:
+            self._state= prob
             self._P= prob
 
         return torch.sum(self._state, 1), torch.sum(prob, 1)
 
     #sample nxm pobability matrix, of 0 dimension, which contains n choise for a random variable
-    def rample_uniform_matrix(self, P):  
+    def sample_uniform_matrix(self, P):  
         state= torch.zeros_like(P, device=device)
         U= torch.rand(self._n).to(device)
         for i in range(P.size()[0]):
@@ -95,8 +108,10 @@ class EPI_dense(torch.nn.Module):
         return self._psMatrix
     
     def get_psMatrix(self):
-
-        return torch.sigmoid(self._psMatrix)
+        psMatrix= torch.sigmoid(self._psMatrix)
+        if self._cc is not None:
+                psMatrix= psMatrix*self._cc
+        return psMatrix
 
 
 if __name__=="__main__":
