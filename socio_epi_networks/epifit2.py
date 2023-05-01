@@ -25,6 +25,23 @@ def get_ER_random_contact(n, avgDegree):
     contact = torch.FloatTensor(graph).to(device)
     return contact
 
+def get_WS_random_contact(n, k, p):
+    #number of nodes
+    #each node is joined with its k nearest neighbors
+    #probability of rewiring each edge
+    graph=nx.watts_strogatz_graph(n, k, p)
+    graph=nx.to_numpy_array(graph)
+    contact = torch.FloatTensor(graph).to(device)
+    return contact
+
+def get_BA_random_contact(n, m):
+    #Number of nodes
+    #Number of edges to attach from a new node to existing nodes
+    graph=nx.barabasi_albert_graph(n, m)
+    graph=nx.to_numpy_array(graph)
+    contact = torch.FloatTensor(graph).to(device)
+    return contact
+
 
 class EPI_dense(torch.nn.Module):
     def __init__(self, ISNet, psMatrix, population, device, train=False, cc=None, recursive=False):
@@ -40,8 +57,13 @@ class EPI_dense(torch.nn.Module):
         if train==True:
             self._psMatrix=torch.nn.Parameter(psMatrix)
         self._P= self._state
+        self._forceCc=torch.tensor([[0, 1, 0, 0],
+                                    [1, 0, 1, 1],
+                                    [1, 1, 0, 1],
+                                    [1, 1, 1, 0]], device=device) 
         self._cc= cc
         self._recursive= recursive
+        self._softmaxLayer= torch.nn.Softmax(dim=1)
     
     def reset_population(self, population):
         self._state= torch.stack((population["S"], population["E"], population["I"], population["R"]))
@@ -62,7 +84,8 @@ class EPI_dense(torch.nn.Module):
         if self._train==False:
             prob= 1- torch.exp(torch.matmul(torch.log(1 - self._psMatrix.T), L))
         else:
-            psMatrix= torch.sigmoid(self._psMatrix)
+            psMatrix= self._softmaxLayer(self._psMatrix)
+            psMatrix= psMatrix*self._forceCc
             if self._cc is not None:
                 psMatrix= psMatrix*self._cc
             prob= 1- torch.exp(torch.matmul(torch.log(1 - psMatrix.T), L))
@@ -74,7 +97,8 @@ class EPI_dense(torch.nn.Module):
                 self._state= self.sample_uniform_matrix(prob)
                 self._P= prob
         elif self._recursive==True:
-            self._state= prob
+            state= self.sample_uniform_matrix(prob)
+            self._state= prob*0.1+state*0.9
             self._P= prob
 
         return torch.sum(self._state, 1), torch.sum(prob, 1)
@@ -108,7 +132,8 @@ class EPI_dense(torch.nn.Module):
         return self._psMatrix
     
     def get_psMatrix(self):
-        psMatrix= torch.sigmoid(self._psMatrix)
+        #psMatrix= torch.sigmoid(self._psMatrix)
+        psMatrix= self._softmaxLayer(self._psMatrix)
         if self._cc is not None:
                 psMatrix= psMatrix*self._cc
         return psMatrix
