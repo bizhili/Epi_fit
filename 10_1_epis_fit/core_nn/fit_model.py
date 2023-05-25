@@ -1,46 +1,16 @@
+import sys
+sys.path.append('../')
+
+import graph.random_graph as random_graph
+import util.create_population as create_population
+
 import torch
 import pandas as pd
 import random
-from epifit.network_generation import generate_random_network
-from epifit.graphing_utils import *
 from matplotlib import pyplot as plt
 import networkx as nx
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
-def population(n:int, device= "cpu"):
-  initial_population = { #a columnar DB somewhat reminds the Pandas DataFrame 
-      "S":torch.ones(n).to(device),
-      "E":torch.zeros(n).to(device),
-      "I":torch.zeros(n).to(device),
-      "R":torch.zeros(n).to(device),
-  }
-  initial_population["S"][0]=0 #first one infective
-  initial_population["I"][0]=1 #first one infective
-  return initial_population
-
-def get_ER_random_contact(n, avgDegree):
-    graph=nx.dense_gnm_random_graph(n, n*avgDegree)
-    graph=nx.to_numpy_array(graph)
-    contact = torch.FloatTensor(graph).to(device)
-    return contact
-
-def get_WS_random_contact(n, k, p):
-    #number of nodes
-    #each node is joined with its k nearest neighbors
-    #probability of rewiring each edge
-    graph=nx.watts_strogatz_graph(n, k, p)
-    graph=nx.to_numpy_array(graph)
-    contact = torch.FloatTensor(graph).to(device)
-    return contact
-
-def get_BA_random_contact(n, m):
-    #Number of nodes
-    #Number of edges to attach from a new node to existing nodes
-    graph=nx.barabasi_albert_graph(n, m)
-    graph=nx.to_numpy_array(graph)
-    contact = torch.FloatTensor(graph).to(device)
-    return contact
 
 
 class EPI_dense(torch.nn.Module):
@@ -58,9 +28,9 @@ class EPI_dense(torch.nn.Module):
             self._psMatrix=torch.nn.Parameter(psMatrix)
         self._P= self._state
         self._forceCc=torch.tensor([[0, 1, 0, 0],
-                                    [1, 0, 1, 1],
-                                    [1, 1, 0, 1],
-                                    [1, 1, 1, 0]], device=device) 
+                                    [0, 0, 1, 0],
+                                    [0, 0, 0, 1],
+                                    [0, 0, 0, 0]], device=device) 
         self._cc= cc
         self._recursive= recursive
         self._softmaxLayer= torch.nn.Softmax(dim=1)
@@ -101,6 +71,10 @@ class EPI_dense(torch.nn.Module):
             self._state= prob*0.1+state*0.9
             self._P= prob
         return torch.sum(self._state, 1), torch.sum(prob, 1)
+    
+    def get_population_num(self):
+
+        return torch.sum(self._state, 1)
 
     #sample nxm pobability matrix, of 0 dimension, which contains n choise for a random variable
     def sample_uniform_matrix(self, P):  
@@ -112,7 +86,7 @@ class EPI_dense(torch.nn.Module):
             U= U+state[i]
         return state
     
-    def get_population(self):
+    def get_population_dir(self):
         return { #a columnar DB somewhat reminds the Pandas DataFrame 
                 "S": self._state[0],
                 "E": self._state[1],
@@ -120,7 +94,6 @@ class EPI_dense(torch.nn.Module):
                 "R": self._state[3],
                 }
     def get_population(self):
-
         return self._state
     
     def get_probability(self):
@@ -142,7 +115,7 @@ if __name__=="__main__":
     n= 1000
     avgDegree= 5
     timeHorizon= 20
-    contact=get_ER_random_contact(n, avgDegree)
+    contact=random_graph.get_ER_random_contact(n, avgDegree)
     contact = contact.requires_grad_(True)
     realData =None
 
@@ -151,6 +124,6 @@ if __name__=="__main__":
                         [0, 0, 0.99, 0],
                         [0, 0, 0, 0.0],
                         [0.0, 0, 0, 0]], device=device)
-        population= population(n, device)
+        population= create_population.population(n, device)
         model= EPI_dense(contact, ps, population, device)
     pass
