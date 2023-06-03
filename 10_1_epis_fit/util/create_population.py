@@ -12,7 +12,8 @@ def population(n:int, device= "cpu"):
   }
   initial_population["S"][firstInfected]=0 
   initial_population["I"][firstInfected]=1 #first one infected
-  return initial_population
+  state= torch.stack((initial_population["S"], initial_population["E"], initial_population["I"], initial_population["R"]))
+  return state
 
 def populations(n: int, number: int, device= "cpu"):
     populations=[]

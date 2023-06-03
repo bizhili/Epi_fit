@@ -12,16 +12,14 @@ import networkx as nx
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-
-class EPI_dense(torch.nn.Module):
+class pure_EPI_dense(torch.nn.Module):
     def __init__(self, ISNet, psMatrix, device, train=False, cc=None, recursive=False, sampleAsState=True):
-        super(EPI_dense, self).__init__()
+        super(pure_EPI_dense, self).__init__()
         self._n= ISNet.size()[0]
         self._IS= ISNet
         self._EE= torch.eye(self._n).to(device)
         self._II= self._EE
         self._RR= self._EE
-        #self._state= torch.stack((population["S"], population["E"], population["I"], population["R"]))
         self._psMatrix= psMatrix
         self._train= train
         if train==True:
@@ -39,29 +37,25 @@ class EPI_dense(torch.nn.Module):
     def reset_probability(self, population):
         #self._state= torch.stack((population["S"], population["E"], population["I"], population["R"]))
         self._P= None
-    
-    def forward_window(self, state, windowSize=6):
-        pass
+
 
     def forward(self, state):
-        if self._train==False or self._recursive==False or self._P is None:
-            psMatrix=self._psMatrix
+
+        if self._train==False:
+            psMatrix= self._psMatrix
         else:
-            state= 0.9*state+0.1*self._P #gradient disappearing here, consider only transfer probability?
             psMatrix= self.get_psMatrix()
+        
+        logProb= 1-self._IS*state[]
+
         L= torch.zeros_like(state, device=device)
-        #logBase= torch.log(1-psMatrix[0, 1])
-        #st2= state[2][None, :]
-        #st0= state[0][:, None]
-        #tempL0= torch.log(1-self._IS*st0*st2*psMatrix[0, 1])
-        #L[0]= tempL0.sum(dim=1)/logBase
-        #print((L[0]-state[0]*torch.matmul(self._IS, state[2])).sum())
+
         L[0]= state[0]*torch.matmul(self._IS, state[2])
         L[1]= torch.matmul(state[1], self._EE)
         L[2]= torch.matmul(state[2], self._II)
         L[3]= torch.matmul(state[3], self._RR)
         prob= 1- torch.exp(torch.matmul(torch.log(1 - psMatrix.T), L))
-
+    
         _stable_prob= 1- torch.sum(prob, 0)
         prob= prob+ state*_stable_prob
         self._P= prob
