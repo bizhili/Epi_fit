@@ -10,7 +10,7 @@ import random
 from matplotlib import pyplot as plt
 import networkx as nx
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+#device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class EPI_dense(torch.nn.Module):
@@ -22,6 +22,7 @@ class EPI_dense(torch.nn.Module):
         self._II= self._EE
         self._RR= self._EE
         #self._state= torch.stack((population["S"], population["E"], population["I"], population["R"]))
+        self._device= device
         self._psMatrix= psMatrix
         self._train= train
         if train==True:
@@ -30,7 +31,7 @@ class EPI_dense(torch.nn.Module):
         self._forceCc=torch.tensor([[0, 1, 0, 0],
                                     [0, 0, 1, 0],
                                     [0, 0, 0, 1],
-                                    [0, 0, 0, 0]], device=device) 
+                                    [0, 0, 0, 0]], device=self._device) 
         self._cc= cc
         self._recursive= recursive
         self._softmaxLayer= torch.nn.Softmax(dim=1)
@@ -49,7 +50,7 @@ class EPI_dense(torch.nn.Module):
         else:
             state= 0.9*state+0.1*self._P #gradient disappearing here, consider only transfer probability?
             psMatrix= self.get_psMatrix()
-        L= torch.zeros_like(state, device=device)
+        L= torch.zeros_like(state, device=self._device)
         #logBase= torch.log(1-psMatrix[0, 1])
         #st2= state[2][None, :]
         #st0= state[0][:, None]
@@ -80,8 +81,8 @@ class EPI_dense(torch.nn.Module):
 
     #sample nxm pobability matrix, of 0 dimension, which contains n choise for a random variable
     def sample_uniform_matrix(self, P):  
-        state= torch.zeros_like(P, device=device)
-        U= torch.rand(self._n).to(device)
+        state= torch.zeros_like(P, device=self._device)
+        U= torch.rand(self._n).to(self._device)
         for i in range(P.size()[0]):
             U= U- P[i]
             state[i]= U<0
