@@ -23,7 +23,7 @@ class pure_EPI_dense(torch.nn.Module):
         if train==True:
             self._psMatrix=torch.nn.Parameter(psMatrix)
         self._forceCc=torch.tensor([[0, 1, 0, 0],
-                                    [0, 0, 1, 0],
+                                    [0, 0, 1, 1],
                                     [0, 0, 0, 1],
                                     [0, 0, 0, 0]], device=device) 
         self._cc= cc
@@ -87,7 +87,7 @@ class pure_EPI_dense(torch.nn.Module):
 
     
     def get_psMatrix(self):
-        if self.train== True:
+        if self._train== True:
             psMatrix= self._Sigmoid(self._psMatrix)
             psMatrix= psMatrix*self._forceCc
             if self._cc is not None:
