@@ -37,3 +37,8 @@ def static_populations(n: int, firstTS: list, device= "cpu"):
     for _, j in enumerate(firstTS):
        populations.append(static_population(n, j, device=device))
     return torch.stack(populations)
+
+def general_populations(kn:int, n:int, device="cpu"):
+    state= torch.zeros([kn, n, 4, 1], device=device)# 3,1000,4,1
+    state[:, :, 0, 0]= 1
+    return state
