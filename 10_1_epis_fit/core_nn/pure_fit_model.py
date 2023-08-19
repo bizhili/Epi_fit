@@ -2,7 +2,6 @@ import sys
 sys.path.append('../')
 
 import graph.random_graph as random_graph
-import util.create_population as create_population
 
 import torch
 import pandas as pd
